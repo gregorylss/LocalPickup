@@ -17,40 +17,29 @@ use OpenApi\Events\DeliveryModuleOptionEvent;
 use OpenApi\Events\OpenApiEvents;
 use OpenApi\Model\Api\DeliveryModuleOption;
 use OpenApi\Model\Api\ModelFactory;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Thelia\Model\ModuleQuery;
 
 class APIListener implements EventSubscriberInterface
 {
-    /** @var ModelFactory */
-    protected $modelFactory;
-
-    /** @var RequestStack */
-    protected $requestStack;
-
     /**
      * APIListener constructor.
-     *
-     * @param ContainerInterface $container We need the container because we use a service from another module
-     *                                      which is not mandatory, and using its service without it being installed will crash
      */
-    public function __construct(ModelFactory $modelFactory, RequestStack $requestStack)
-    {
-        $this->modelFactory = $modelFactory;
-        $this->requestStack = $requestStack;
-    }
+    public function __construct(
+        protected ModelFactory $modelFactory,
+        protected RequestStack $requestStack
+    ) {}
 
     public function getDeliveryModuleOptions(DeliveryModuleOptionEvent $deliveryModuleOptionEvent): void
     {
         $module = ModuleQuery::create()->findOneByCode(LocalPickup::getModuleCode());
-        if ($deliveryModuleOptionEvent->getModule()->getId() !== $module->getId()) {
+        if ($deliveryModuleOptionEvent->getModule()->getId() !== $module?->getId()) {
             return;
         }
 
         $isValid = true;
-        $locale = $this->requestStack->getCurrentRequest()->getSession()->getLang()->getLocale();
+        $locale = $this->requestStack->getCurrentRequest()?->getSession()->getLang()->getLocale();
 
         $postage = LocalPickup::getConfigValue(LocalPickup::PRICE_VAR_NAME, 0);
         $commentary = LocalPickup::getConfigValue(
@@ -64,13 +53,13 @@ class APIListener implements EventSubscriberInterface
         $minimumDeliveryDate = '';
         $maximumDeliveryDate = '';
 
-        $images = $module->getModuleImages();
+        $images = $module?->getModuleImages();
         $imageId = 0;
 
-        $title = $module->setLocale($locale)->getTitle();
+        $title = $module?->setLocale($locale)->getTitle();
 
         if ($images->count() > 0) {
-            $imageId = $images->getFirst()->getId();
+            $imageId = $images->getFirst()?->getId();
         }
 
         /** @var DeliveryModuleOption $deliveryModuleOption */
@@ -84,8 +73,7 @@ class APIListener implements EventSubscriberInterface
             ->setMaximumDeliveryDate($maximumDeliveryDate)
             ->setPostage($postage)
             ->setPostageTax($postageTax)
-            ->setPostageUntaxed($postage - $postageTax)
-        ;
+            ->setPostageUntaxed($postage - $postageTax);
 
         // Pre-5.3.x compatibility
         if (method_exists($deliveryModuleOption, 'setDescription')) {
